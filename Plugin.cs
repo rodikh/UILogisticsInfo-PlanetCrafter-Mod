@@ -10,9 +10,12 @@ using UnityEngine.UI;
 
 namespace LogisticsInfo
 {
-    [BepInPlugin("rodik.theplanetcraftermods.logisticsinfo", "(UI) Logistics Info", "1.0.0.0")]
+    [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
     public class Plugin : BaseUnityPlugin
     {
+        public const string PluginGuid = "rodikh.planetcrafter.logisticsinfo";
+        public const string PluginName = "Logistics Info";
+        public const string PluginVersion = "1.0.0";
         static Plugin me;
         static ManualLogSource logger;
 
@@ -74,25 +77,36 @@ namespace LogisticsInfo
             modEnabled = Config.Bind("General", "Enabled", true, "Is the mod enabled?");
             debugMode = Config.Bind("General", "DebugMode", false, "Enable detailed logging?");
 
-            keyToggle = Config.Bind("Keys", "Toggle", "L",
-                "Primary key (with LeftCtrl held) to toggle the logistics info display. Use a single letter or key name, e.g. L.");
+            keyToggle = Config.Bind(
+                "Keys",
+                "Toggle",
+                "L",
+                "Primary key (with LeftCtrl held) to toggle the logistics info display. Use a single letter or key name, e.g. L."
+            );
 
-            panelX = Config.Bind("UI", "PanelX", -500,
-                "Shift the panel in the X direction by this amount relative to screen center.");
-            panelY = Config.Bind("UI", "PanelY", 0,
-                "Shift the panel in the Y direction by this amount relative to screen center.");
-            panelWidth = Config.Bind("UI", "PanelWidth", 350,
-                "The width of the panel.");
-            panelOpacity = Config.Bind("UI", "PanelOpacity", 0.95f,
-                "The opacity: 1 - fully opaque, 0 - fully transparent.");
-            fontSize = Config.Bind("UI", "FontSize", 20,
-                "The font size.");
-            iconSize = Config.Bind("UI", "IconSize", 26,
-                "The icon size in pixels.");
-            rowHeight = Config.Bind("UI", "RowHeight", 30,
-                "The height of item rows in pixels.");
-            cfgMargin = Config.Bind("UI", "Margin", 5,
-                "The margin between visual elements.");
+            panelX = Config.Bind(
+                "UI",
+                "PanelX",
+                -500,
+                "Shift the panel in the X direction by this amount relative to screen center."
+            );
+            panelY = Config.Bind(
+                "UI",
+                "PanelY",
+                0,
+                "Shift the panel in the Y direction by this amount relative to screen center."
+            );
+            panelWidth = Config.Bind("UI", "PanelWidth", 350, "The width of the panel.");
+            panelOpacity = Config.Bind(
+                "UI",
+                "PanelOpacity",
+                0.95f,
+                "The opacity: 1 - fully opaque, 0 - fully transparent."
+            );
+            fontSize = Config.Bind("UI", "FontSize", 20, "The font size.");
+            iconSize = Config.Bind("UI", "IconSize", 26, "The icon size in pixels.");
+            rowHeight = Config.Bind("UI", "RowHeight", 30, "The height of item rows in pixels.");
+            cfgMargin = Config.Bind("UI", "Margin", 5, "The margin between visual elements.");
 
             font = Resources.GetBuiltinResource<Font>("Arial.ttf");
 
@@ -122,7 +136,8 @@ namespace LogisticsInfo
 
             // LeftCtrl + key (same pattern as Ctrl+ shortcuts in-game)
             toggleAction = new InputAction("LogisticsInfo Toggle", type: InputActionType.Button);
-            toggleAction.AddCompositeBinding("ButtonWithOneModifier")
+            toggleAction
+                .AddCompositeBinding("ButtonWithOneModifier")
                 .With("Modifier", "<Keyboard>/leftCtrl")
                 .With("Button", key);
             toggleAction.Enable();
@@ -130,7 +145,8 @@ namespace LogisticsInfo
 
         void Update()
         {
-            if (!modEnabled.Value) return;
+            if (!modEnabled.Value)
+                return;
 
             if (toggleAction != null && toggleAction.WasPressedThisFrame())
             {
@@ -158,7 +174,8 @@ namespace LogisticsInfo
         [HarmonyPatch(typeof(ActionOpenable), nameof(ActionOpenable.OnHover))]
         static void ActionOpenable_OnHover(ActionOpenable __instance)
         {
-            if (!modEnabled.Value || !displayEnabled) return;
+            if (!modEnabled.Value || !displayEnabled)
+                return;
             TryShowLogisticsInfo(__instance);
         }
 
@@ -176,7 +193,8 @@ namespace LogisticsInfo
         [HarmonyPatch(typeof(ActionGroupSelector), nameof(ActionGroupSelector.OnHover))]
         static void ActionGroupSelector_OnHover(ActionGroupSelector __instance)
         {
-            if (!modEnabled.Value || !displayEnabled) return;
+            if (!modEnabled.Value || !displayEnabled)
+                return;
             TryShowLogisticsInfo(__instance);
         }
 
@@ -245,12 +263,14 @@ namespace LogisticsInfo
 
         static void OnInventory(Inventory inventory, Actionnable instance)
         {
-            if (inventory == null) return;
+            if (inventory == null)
+                return;
 
             var logisticEntity = inventory.GetLogisticEntity();
             if (logisticEntity == null || !logisticEntity.HasDemandOrSupplyGroups())
             {
-                if (panel != null) panel.SetActive(false);
+                if (panel != null)
+                    panel.SetActive(false);
                 return;
             }
 
@@ -305,15 +325,36 @@ namespace LogisticsInfo
             priorityText.verticalOverflow = VerticalWrapMode.Overflow;
             priorityRt = priorityGo.GetComponent<RectTransform>();
 
-            supplyHeaderGo = CreateSectionHeader("SupplyHeader", "\u25b2 SUPPLY", supplyColor,
-                supplyHeaderBgColor, out supplyHeaderText, out supplyHeaderRt, out supplyHeaderBg);
+            supplyHeaderGo = CreateSectionHeader(
+                "SupplyHeader",
+                "\u25b2 SUPPLY",
+                supplyColor,
+                supplyHeaderBgColor,
+                out supplyHeaderText,
+                out supplyHeaderRt,
+                out supplyHeaderBg
+            );
 
-            demandHeaderGo = CreateSectionHeader("DemandHeader", "\u25bc DEMAND", demandColor,
-                demandHeaderBgColor, out demandHeaderText, out demandHeaderRt, out demandHeaderBg);
+            demandHeaderGo = CreateSectionHeader(
+                "DemandHeader",
+                "\u25bc DEMAND",
+                demandColor,
+                demandHeaderBgColor,
+                out demandHeaderText,
+                out demandHeaderRt,
+                out demandHeaderBg
+            );
         }
 
-        static GameObject CreateSectionHeader(string name, string text, Color textColor,
-            Color bgColor, out Text headerText, out RectTransform headerRt, out Image headerBgImage)
+        static GameObject CreateSectionHeader(
+            string name,
+            string text,
+            Color textColor,
+            Color bgColor,
+            out Text headerText,
+            out RectTransform headerRt,
+            out Image headerBgImage
+        )
         {
             var headerBgGo = new GameObject(name + "Bg");
             headerBgGo.transform.SetParent(bgGo.transform, false);
@@ -374,10 +415,12 @@ namespace LogisticsInfo
 
         static void UpdateDisplay()
         {
-            if (panel == null || currentInventory == null) return;
+            if (panel == null || currentInventory == null)
+                return;
 
             var logisticEntity = currentInventory.GetLogisticEntity();
-            if (logisticEntity == null) return;
+            if (logisticEntity == null)
+                return;
 
             var supplyGroups = logisticEntity.GetSupplyGroups();
             var demandGroups = logisticEntity.GetDemandGroups();
@@ -435,9 +478,27 @@ namespace LogisticsInfo
             if (hasSupply)
             {
                 yPos -= m;
-                yPos = LayoutSectionHeader(supplyHeaderGo, supplyHeaderText, supplyHeaderRt,
-                    supplyHeaderBg, fs, yPos, contentW, sectionH, m);
-                yPos = LayoutItemRows(supplyRows, supplyGroups, supplyCount, fs, yPos, contentW, rh, m);
+                yPos = LayoutSectionHeader(
+                    supplyHeaderGo,
+                    supplyHeaderText,
+                    supplyHeaderRt,
+                    supplyHeaderBg,
+                    fs,
+                    yPos,
+                    contentW,
+                    sectionH,
+                    m
+                );
+                yPos = LayoutItemRows(
+                    supplyRows,
+                    supplyGroups,
+                    supplyCount,
+                    fs,
+                    yPos,
+                    contentW,
+                    rh,
+                    m
+                );
             }
             HideExtraRows(supplyRows, supplyCount);
 
@@ -446,16 +507,42 @@ namespace LogisticsInfo
             if (hasDemand)
             {
                 yPos -= m;
-                yPos = LayoutSectionHeader(demandHeaderGo, demandHeaderText, demandHeaderRt,
-                    demandHeaderBg, fs, yPos, contentW, sectionH, m);
-                yPos = LayoutItemRows(demandRows, demandGroups, demandCount, fs, yPos, contentW, rh, m);
+                yPos = LayoutSectionHeader(
+                    demandHeaderGo,
+                    demandHeaderText,
+                    demandHeaderRt,
+                    demandHeaderBg,
+                    fs,
+                    yPos,
+                    contentW,
+                    sectionH,
+                    m
+                );
+                yPos = LayoutItemRows(
+                    demandRows,
+                    demandGroups,
+                    demandCount,
+                    fs,
+                    yPos,
+                    contentW,
+                    rh,
+                    m
+                );
             }
             HideExtraRows(demandRows, demandCount);
         }
 
-        static float LayoutSectionHeader(GameObject headerParent, Text headerText,
-            RectTransform headerRt, Image headerBgImage,
-            int fs, float yPos, float contentW, int sectionH, int m)
+        static float LayoutSectionHeader(
+            GameObject headerParent,
+            Text headerText,
+            RectTransform headerRt,
+            Image headerBgImage,
+            int fs,
+            float yPos,
+            float contentW,
+            int sectionH,
+            int m
+        )
         {
             headerText.fontSize = fs;
             var parentRt = headerParent.GetComponent<RectTransform>();
@@ -470,14 +557,23 @@ namespace LogisticsInfo
             return yPos;
         }
 
-        static float LayoutItemRows(List<ItemRow> rows, HashSet<Group> groups,
-            int count, int fs, float yPos, float contentW, int rh, int m)
+        static float LayoutItemRows(
+            List<ItemRow> rows,
+            HashSet<Group> groups,
+            int count,
+            int fs,
+            float yPos,
+            float contentW,
+            int rh,
+            int m
+        )
         {
             int iSize = iconSize.Value;
             int i = 0;
             foreach (var group in groups)
             {
-                if (i >= count || i >= rows.Count) break;
+                if (i >= count || i >= rows.Count)
+                    break;
                 var row = rows[i];
                 row.rowObject.SetActive(true);
 
@@ -523,9 +619,11 @@ namespace LogisticsInfo
 
         static string GetContainerName()
         {
-            if (currentActionable == null) return "";
+            if (currentActionable == null)
+                return "";
 
-            var woa = currentActionable.GetComponentInParent<WorldObjectAssociated>()
+            var woa =
+                currentActionable.GetComponentInParent<WorldObjectAssociated>()
                 ?? currentActionable.GetComponentInChildren<WorldObjectAssociated>();
             if (woa != null && woa.GetWorldObject() != null)
             {

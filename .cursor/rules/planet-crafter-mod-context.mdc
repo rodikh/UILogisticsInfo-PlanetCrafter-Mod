@@ -1,0 +1,39 @@
+---
+description: How to get info and find references for Planet Crafter modding
+alwaysApply: true
+---
+
+# Planet Crafter Mod Context
+
+Use this when working on LogisticsInfo or related modding questions.
+
+## Where to Find References
+
+- **Game**: `C:\Program Files (x86)\Steam\steamapps\common\The Planet Crafter`
+- **Managed DLLs**: `Planet Crafter_Data\Managed\` (Assembly-CSharp, UnityEngine, etc.)
+- **BepInEx**: `BepInEx\core\` (BepInEx.dll, 0Harmony.dll)
+- **Decompiled code**: `C:\Work\Modding\PlanetCrafter-Modding\decompiled\Assembly-CSharp\` (source files, especially `SpaceCraft\`)
+
+## How to Get Information
+
+1. **Game classes/methods** – Inspect decompiled `SpaceCraft\*.cs` (e.g. `MachineAutoCrafter`, `UiWindowGroupSelector`, `LogisticManager`, `InventoryAssociated`).
+2. **Method signatures for Harmony** – Use exact signatures from decompiled code before patching.
+3. **Example mods** – `C:\Work\Modding\PlanetCrafter-Modding\ThePlanetCrafterMods` or `https://github.com/akarnokd/ThePlanetCrafterMods`
+4. **Skills** – When creating/updating Planet Crafter mods, use the **planet-crafter-bepinex-mod** skill (DLL paths, csproj template, patch patterns, build/deploy).
+
+## Build & Deploy
+
+**Manual:**
+```powershell
+dotnet build -c Release
+Copy-Item ".\bin\Release\netstandard2.1\LogisticsInfo.dll" "C:\Program Files (x86)\Steam\steamapps\common\The Planet Crafter\BepInEx\plugins\LogisticsInfo.dll" -Force
+```
+
+**Scripts:**
+- `.\deploy.ps1` — Build and copy DLL to game's BepInEx/plugins. Or double-click `deploy.bat`.
+- `.\pack.ps1` — Build and create Nexus distribution zip (`dist\LogisticsInfo-{version}.zip`).
+
+**Nexus Mods:**
+- Zip contains only the DLL at root (Vortex installs to BepInEx/plugins automatically).
+- Version is read from `PluginVersion` in Plugin.cs.
+- Close the game before deploy if the DLL is locked.
