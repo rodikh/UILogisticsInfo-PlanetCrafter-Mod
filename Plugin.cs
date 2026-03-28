@@ -62,6 +62,7 @@ namespace LogisticsInfo
 
         static InputAction toggleAction;
         static Font font;
+        static Sprite circleSprite;
 
         static readonly Color supplyColor = new Color(0.3f, 0.9f, 0.3f, 1f);
         static readonly Color demandColor = new Color(0.9f, 0.45f, 0.3f, 1f);
@@ -217,6 +218,232 @@ namespace LogisticsInfo
             {
                 panel.SetActive(false);
             }
+        }
+
+        // --- Logistics Selector Badges ---
+
+        [HarmonyPostfix]
+        [HarmonyPatch(typeof(LogisticSelector), "SetSupplyDemandGroups")]
+        static void LogisticSelector_SetSupplyDemandGroups(LogisticSelector __instance)
+        {
+            if (!modEnabled.Value)
+                return;
+
+            var logisticManager = Managers.GetManager<LogisticManager>();
+            if (logisticManager == null)
+                return;
+
+            Dictionary<int, int> supplyCounts;
+            Dictionary<int, int> demandCounts;
+            int supplyEverythingCount;
+            ComputeLogisticCounts(logisticManager, out supplyCounts, out demandCounts, out supplyEverythingCount);
+
+            AddBadgesToSelector(__instance.groupSelectorSupply, supplyCounts);
+            AddBadgesToSelector(__instance.groupSelectorDemand, demandCounts);
+            UpdateEverythingLabel(__instance.groupSelectorSupply, supplyEverythingCount);
+        }
+
+        static void ComputeLogisticCounts(
+            LogisticManager logisticManager,
+            out Dictionary<int, int> supplyCounts,
+            out Dictionary<int, int> demandCounts,
+            out int supplyEverythingCount)
+        {
+            supplyCounts = new Dictionary<int, int>();
+            demandCounts = new Dictionary<int, int>();
+            supplyEverythingCount = 0;
+
+            var supplyInventories = Traverse.Create(logisticManager)
+                .Field<List<Inventory>>("_supplyInventories").Value;
+            var demandInventories = Traverse.Create(logisticManager)
+                .Field<List<Inventory>>("_demandInventories").Value;
+
+            int planetHash = 0;
+            var planetLoader = Managers.GetManager<PlanetLoader>();
+            if (planetLoader != null && planetLoader.GetCurrentPlanetData() != null)
+                planetHash = planetLoader.GetCurrentPlanetData().GetPlanetHash();
+
+            if (supplyInventories != null)
+            {
+                foreach (var inv in supplyInventories)
+                {
+                    if (inv == null) continue;
+                    var entity = inv.GetLogisticEntity();
+                    if (entity == null || entity.GetPlanetHash() != planetHash) continue;
+
+                    var groups = entity.GetSupplyGroups();
+                    if (groups == null) continue;
+
+                    if (groups.Count > 140)
+                    {
+                        supplyEverythingCount++;
+                        continue;
+                    }
+
+                    foreach (var group in groups)
+                    {
+                        int hash = group.stableHashCode;
+                        int existing;
+                        supplyCounts.TryGetValue(hash, out existing);
+                        supplyCounts[hash] = existing + 1;
+                    }
+                }
+            }
+
+            if (demandInventories != null)
+            {
+                foreach (var inv in demandInventories)
+                {
+                    if (inv == null) continue;
+                    var entity = inv.GetLogisticEntity();
+                    if (entity == null || entity.GetPlanetHash() != planetHash) continue;
+
+                    var groups = entity.GetDemandGroups();
+                    if (groups == null) continue;
+
+                    foreach (var group in groups)
+                    {
+                        int hash = group.stableHashCode;
+                        int existing;
+                        demandCounts.TryGetValue(hash, out existing);
+                        demandCounts[hash] = existing + 1;
+                    }
+                }
+            }
+        }
+
+        static void UpdateEverythingLabel(GroupSelector supplySelector, int count)
+        {
+            if (supplySelector == null || supplySelector.listContainer == null)
+                return;
+
+            var existing = supplySelector.listContainer.transform.Find("LogisticEverythingLabel");
+            if (existing != null)
+                Object.Destroy(existing.gameObject);
+
+            if (count <= 0)
+                return;
+
+            var labelGo = new GameObject("LogisticEverythingLabel");
+            labelGo.transform.SetParent(supplySelector.listContainer.transform, false);
+
+            var le = labelGo.AddComponent<LayoutElement>();
+            le.ignoreLayout = true;
+
+            var text = labelGo.AddComponent<Text>();
+            text.text = count + (count == 1 ? " Container" : " Containers") + " supplying \"Everything\"";
+            text.font = font;
+            text.fontSize = 22;
+            text.color = Color.white;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.horizontalOverflow = HorizontalWrapMode.Overflow;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+
+            var rt = labelGo.GetComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0, 0);
+            rt.anchorMax = new Vector2(1, 0);
+            rt.pivot = new Vector2(0.5f, 0);
+            rt.anchoredPosition = new Vector2(0, 15);
+            rt.sizeDelta = new Vector2(0, 35);
+
+            var outline = labelGo.AddComponent<Outline>();
+            outline.effectColor = Color.black;
+            outline.effectDistance = new Vector2(1, -1);
+        }
+
+        static void AddBadgesToSelector(GroupSelector selector, Dictionary<int, int> counts)
+        {
+            if (selector == null || selector.groupList == null)
+                return;
+
+            var groups = selector.GetAddedGroups();
+            var displayers = Traverse.Create(selector.groupList)
+                .Field<List<GroupDisplayer>>("groupsDisplayer").Value;
+
+            if (displayers == null)
+                return;
+
+            for (int i = 0; i < groups.Count && i < displayers.Count; i++)
+            {
+                var group = groups[i];
+                var displayer = displayers[i];
+
+                if (group == null || displayer == null)
+                    continue;
+
+                var existing = displayer.transform.Find("LogisticCountBadge");
+                if (existing != null)
+                    Object.Destroy(existing.gameObject);
+
+                int count;
+                counts.TryGetValue(group.stableHashCode, out count);
+
+                if (count > 0)
+                    CreateCountBadge(displayer.gameObject, count);
+            }
+        }
+
+        static void CreateCountBadge(GameObject parent, int count)
+        {
+            var badge = new GameObject("LogisticCountBadge");
+            badge.transform.SetParent(parent.transform, false);
+
+            var img = badge.AddComponent<Image>();
+            img.sprite = GetCircleSprite();
+            img.color = new Color(0.1f, 0.1f, 0.1f, 0.85f);
+
+            var rt = badge.GetComponent<RectTransform>();
+            rt.anchorMin = new Vector2(1, 1);
+            rt.anchorMax = new Vector2(1, 1);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = new Vector2(-2, -2);
+            rt.sizeDelta = new Vector2(20, 20);
+
+            var textGo = new GameObject("Text");
+            textGo.transform.SetParent(badge.transform, false);
+            var text = textGo.AddComponent<Text>();
+            text.text = count.ToString();
+            text.font = font;
+            text.fontSize = 12;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.color = Color.white;
+            text.horizontalOverflow = HorizontalWrapMode.Overflow;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+
+            var textRt = textGo.GetComponent<RectTransform>();
+            textRt.anchorMin = Vector2.zero;
+            textRt.anchorMax = Vector2.one;
+            textRt.offsetMin = Vector2.zero;
+            textRt.offsetMax = Vector2.zero;
+
+            var outline = textGo.AddComponent<Outline>();
+            outline.effectColor = Color.black;
+            outline.effectDistance = new Vector2(1, -1);
+        }
+
+        static Sprite GetCircleSprite()
+        {
+            if (circleSprite != null)
+                return circleSprite;
+
+            int size = 32;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            float radius = size / 2f;
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = x - radius + 0.5f;
+                    float dy = y - radius + 0.5f;
+                    tex.SetPixel(x, y, dx * dx + dy * dy <= radius * radius
+                        ? Color.white
+                        : Color.clear);
+                }
+            }
+            tex.Apply();
+            circleSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
+            return circleSprite;
         }
 
         // --- Core Logic ---
