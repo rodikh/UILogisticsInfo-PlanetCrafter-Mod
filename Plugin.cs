@@ -15,7 +15,7 @@ namespace LogisticsInfo
     {
         public const string PluginGuid = "rodikh.planetcrafter.logisticsinfo";
         public const string PluginName = "Logistics Info";
-        public const string PluginVersion = "1.0.0";
+        public const string PluginVersion = "1.0.2";
         static Plugin me;
         static ManualLogSource logger;
 
@@ -63,6 +63,7 @@ namespace LogisticsInfo
         static InputAction toggleAction;
         static Font font;
         static Sprite circleSprite;
+        static Sprite supplyAllIconSprite;
 
         static readonly Color supplyColor = new Color(0.3f, 0.9f, 0.3f, 1f);
         static readonly Color demandColor = new Color(0.9f, 0.45f, 0.3f, 1f);
@@ -223,11 +224,22 @@ namespace LogisticsInfo
         // --- Logistics Selector Badges ---
 
         [HarmonyPostfix]
+        [HarmonyPatch(typeof(LogisticSelector), nameof(LogisticSelector.InitLogisticSelector))]
+        static void LogisticSelector_InitLogisticSelector(LogisticSelector __instance)
+        {
+            if (supplyAllIconSprite == null && __instance.supplyAllIcon != null)
+                supplyAllIconSprite = __instance.supplyAllIcon.GetComponentInChildren<Image>()?.sprite;
+        }
+
+        [HarmonyPostfix]
         [HarmonyPatch(typeof(LogisticSelector), "SetSupplyDemandGroups")]
         static void LogisticSelector_SetSupplyDemandGroups(LogisticSelector __instance)
         {
             if (!modEnabled.Value)
                 return;
+
+            if (supplyAllIconSprite == null && __instance.supplyAllIcon != null)
+                supplyAllIconSprite = __instance.supplyAllIcon.GetComponentInChildren<Image>()?.sprite;
 
             var logisticManager = Managers.GetManager<LogisticManager>();
             if (logisticManager == null)
@@ -654,6 +666,8 @@ namespace LogisticsInfo
 
             int supplyCount = supplyGroups?.Count ?? 0;
             int demandCount = demandGroups?.Count ?? 0;
+            bool supplyEverything = supplyCount > 140;
+            int displaySupplyCount = supplyEverything ? 1 : supplyCount;
 
             string containerName = GetContainerName();
 
@@ -665,13 +679,13 @@ namespace LogisticsInfo
             int priorityH = (int)(rh * 0.7f);
             int sectionH = rh;
 
-            EnsureRows(supplyRows, supplyCount, "SupplyRow");
+            EnsureRows(supplyRows, displaySupplyCount, "SupplyRow");
             EnsureRows(demandRows, demandCount, "DemandRow");
 
             int totalHeight = 2 * m + titleH + priorityH;
-            if (supplyCount > 0)
+            if (displaySupplyCount > 0)
             {
-                totalHeight += m + sectionH + supplyCount * rh;
+                totalHeight += m + sectionH + displaySupplyCount * rh;
             }
             if (demandCount > 0)
             {
@@ -700,7 +714,7 @@ namespace LogisticsInfo
             priorityRt.sizeDelta = new Vector2(contentW, priorityH);
             yPos -= priorityH / 2f;
 
-            bool hasSupply = supplyCount > 0;
+            bool hasSupply = displaySupplyCount > 0;
             supplyHeaderGo.SetActive(hasSupply);
             if (hasSupply)
             {
@@ -716,18 +730,25 @@ namespace LogisticsInfo
                     sectionH,
                     m
                 );
-                yPos = LayoutItemRows(
-                    supplyRows,
-                    supplyGroups,
-                    supplyCount,
-                    fs,
-                    yPos,
-                    contentW,
-                    rh,
-                    m
-                );
+                if (supplyEverything)
+                {
+                    yPos = LayoutEverythingRow(supplyRows[0], fs, yPos, contentW, rh, m);
+                }
+                else
+                {
+                    yPos = LayoutItemRows(
+                        supplyRows,
+                        supplyGroups,
+                        supplyCount,
+                        fs,
+                        yPos,
+                        contentW,
+                        rh,
+                        m
+                    );
+                }
             }
-            HideExtraRows(supplyRows, supplyCount);
+            HideExtraRows(supplyRows, displaySupplyCount);
 
             bool hasDemand = demandCount > 0;
             demandHeaderGo.SetActive(hasDemand);
@@ -784,6 +805,56 @@ namespace LogisticsInfo
             return yPos;
         }
 
+        static Sprite FindSupplyAllIconSprite()
+        {
+            foreach (var sel in Resources.FindObjectsOfTypeAll<LogisticSelector>())
+            {
+                if (sel.supplyAllIcon == null) continue;
+                var img = sel.supplyAllIcon.GetComponent<Image>()
+                       ?? sel.supplyAllIcon.GetComponentInChildren<Image>();
+                if (img?.sprite != null)
+                    return img.sprite;
+            }
+            return null;
+        }
+
+        static float LayoutEverythingRow(ItemRow row, int fs, float yPos, float contentW, int rh, int m)
+        {
+            int iSize = iconSize.Value;
+            row.rowObject.SetActive(true);
+            row.nameText.fontSize = fs;
+            row.nameText.color = supplyColor;
+            row.nameText.text = "Everything";
+
+            if (supplyAllIconSprite == null)
+                supplyAllIconSprite = FindSupplyAllIconSprite();
+
+            if (supplyAllIconSprite != null)
+            {
+                row.icon.sprite = supplyAllIconSprite;
+                row.icon.enabled = true;
+            }
+            else
+            {
+                row.icon.enabled = false;
+            }
+
+            yPos -= rh / 2f;
+            row.rowRt.localPosition = new Vector3(0, yPos, 0);
+            row.rowRt.sizeDelta = new Vector2(contentW, rh);
+
+            row.iconRt.localPosition = new Vector3(-contentW / 2f + m + iSize / 2f, 0, 0);
+            row.iconRt.sizeDelta = new Vector2(iSize, iSize);
+
+            float nameX = -contentW / 2f + m + iSize + m;
+            float nameW = contentW - iSize - 3 * m;
+            row.nameRt.localPosition = new Vector3(nameX + nameW / 2f, 0, 0);
+            row.nameRt.sizeDelta = new Vector2(nameW, rh);
+
+            yPos -= rh / 2f;
+            return yPos;
+        }
+
         static float LayoutItemRows(
             List<ItemRow> rows,
             HashSet<Group> groups,
@@ -805,6 +876,7 @@ namespace LogisticsInfo
                 row.rowObject.SetActive(true);
 
                 row.nameText.fontSize = fs;
+                row.nameText.color = Color.white;
                 row.nameText.text = Readable.GetGroupName(group);
 
                 var sprite = group.GetImage();
